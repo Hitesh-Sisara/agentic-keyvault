@@ -16,7 +16,9 @@
   "dependencies": {
     "@agentic-keyvault/shared": "workspace:*",
     "commander": "^12.1.0",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-sealedbox-js": "^1.2.0"
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",

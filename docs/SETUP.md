@@ -83,6 +83,28 @@ akv token mint ci-agent --project <id> --write
 
 Headless usage: set `AKV_URL` and `AKV_TOKEN` env vars instead of `akv login`.
 
+### Rotate the master key (KEK)
+
+```bash
+openssl rand -base64 32                 # the new key
+bunx wrangler secret put MASTER_KEK_V1  # save the CURRENT key as the retired one
+bunx wrangler secret put MASTER_KEK     # set the new key as active
+# set KEK_VERSION=2 in wrangler.jsonc vars, redeploy, then:
+akv kek rotate                          # re-wraps all DEKs to v2
+bunx wrangler secret delete MASTER_KEK_V1
+```
+
+### Sync to external platforms ("rotate once, sync everywhere")
+
+Provider credentials stay in your environment — they are never stored in the vault.
+
+```bash
+akv sync targets                                            # list targets + required env
+akv sync dotenv     --project <id> --auto --out .env
+akv sync cloudflare --project <id> --auto --worker my-worker  # CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+akv sync github     --project <id> --auto --repo-slug acme/app  # GITHUB_TOKEN
+```
+
 ## MCP server (for AI agents)
 
 Configure your MCP client (Claude Desktop, Kiro, Claude Code, etc.):
