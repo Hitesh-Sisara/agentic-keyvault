@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (all packages)
+        run: |
+          set -e
+          for p in worker shared cli mcp; do
+            echo "== typecheck $p =="
+            (cd packages/$p && bunx tsc --noEmit)
+          done
+
+      - name: Test (worker)
+        run: cd packages/worker && bunx vitest --run
+
+      - name: Build (cli, mcp, shared)
+        run: bun run build

@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 import { Command } from "commander";
 import { registerAuth } from "./commands/auth";
 import { registerProjects } from "./commands/projects";
