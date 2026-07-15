@@ -1,0 +1,38 @@
+# deps
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+*.tsbuildinfo
+
+# cloudflare / wrangler
+.wrangler/
+.dev.vars
+.dev.vars.*
+wrangler.local.jsonc
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# CLI local config (never commit real tokens)
+.akv/
+config.local.json
+
+# logs
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# test coverage
+coverage/

@@ -1,0 +1,19 @@
+{
+  "name": "agentic-keyvault",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Cloudflare-native secrets manager with a CLI and MCP server. Never lose an API key again.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "bun run --filter '*' build",
+    "test": "bun run --filter '*' test",
+    "typecheck": "bun run --filter '*' typecheck"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}
