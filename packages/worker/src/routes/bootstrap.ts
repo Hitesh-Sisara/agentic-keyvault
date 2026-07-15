@@ -18,7 +18,7 @@ bootstrap.post("/", async (c) => {
   if ((await countTokens(c.env.DB)) > 0) {
     throw new HTTPException(403, { message: "already bootstrapped" });
   }
-  const { token, row } = await mintToken(c.env.DB, {
+  const { token, row } = await mintToken(c.env.DB, c.env.TOKEN_PEPPER, {
     name: "bootstrap-admin",
     scope: "admin",
     canWrite: true

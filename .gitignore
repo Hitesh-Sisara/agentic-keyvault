@@ -36,3 +36,6 @@ bun-debug.log*
 
 # test coverage
 coverage/
+
+# wrangler generated runtime types (regenerate with `bun run types`)
+worker-configuration.d.ts

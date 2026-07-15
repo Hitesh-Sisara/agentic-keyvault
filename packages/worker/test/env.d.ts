@@ -4,6 +4,8 @@ declare module "cloudflare:test" {
   interface ProvidedEnv {
     DB: D1Database;
     MASTER_KEK: string;
+    KEK_VERSION: string;
+    TOKEN_PEPPER: string;
     ALLOW_BOOTSTRAP: string;
     TEST_MIGRATIONS: D1Migration[];
   }

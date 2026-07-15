@@ -10,7 +10,7 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match) throw new HTTPException(401, { message: "missing bearer token" });
 
-  const token = await findTokenByPlaintext(c.env.DB, match[1]!.trim());
+  const token = await findTokenByPlaintext(c.env.DB, c.env.TOKEN_PEPPER, match[1]!.trim());
   if (!token || token.revoked) throw new HTTPException(401, { message: "invalid token" });
   if (token.expires_at && token.expires_at < Date.now()) {
     throw new HTTPException(401, { message: "token expired" });

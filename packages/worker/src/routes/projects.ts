@@ -5,15 +5,13 @@ import { ensureAdmin, ensureProjectAccess } from "../auth";
 import { createProject, listProjects, getProject } from "../store/projects";
 import { createRepo, listReposByProject } from "../store/repos";
 import { writeAudit } from "../store/audit";
+import { parseBody, createProjectSchema, bindRepoSchema } from "../validation";
 
 export const projects = new Hono<AppEnv>();
 
 projects.post("/", async (c) => {
   ensureAdmin(c.get("token"));
-  const body = await c.req
-    .json<{ name?: string; description?: string }>()
-    .catch(() => ({}) as { name?: string; description?: string });
-  if (!body.name?.trim()) throw new HTTPException(400, { message: "name is required" });
+  const body = await parseBody(c, createProjectSchema);
 
   const project = await createProject(c.env.DB, body.name.trim(), body.description);
   await writeAudit(c.env.DB, {
@@ -48,10 +46,7 @@ projects.post("/:id/repos", async (c) => {
   const project = await getProject(c.env.DB, id);
   if (!project) throw new HTTPException(404, { message: "project not found" });
 
-  const body = await c.req
-    .json<{ origin?: string }>()
-    .catch(() => ({}) as { origin?: string });
-  if (!body.origin?.trim()) throw new HTTPException(400, { message: "origin is required" });
+  const body = await parseBody(c, bindRepoSchema);
 
   const repo = await createRepo(c.env.DB, id, body.origin.trim());
   await writeAudit(c.env.DB, {

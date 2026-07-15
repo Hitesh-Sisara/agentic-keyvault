@@ -1,6 +1,13 @@
-import { seal, open } from "./crypto";
+import { sealValue, openValue, rewrapDek, type Keyring } from "./crypto";
 import { newSecretId, newVersionId } from "./ids";
-import { getSecret, getSecretByScopeName, getCurrentVersionRow, getVersionRow } from "./store/secrets";
+import {
+  getSecret,
+  getSecretByScopeName,
+  getCurrentVersionRow,
+  getVersionRow,
+  listAllWrapFields,
+  updateVersionWrap
+} from "./store/secrets";
 import type { Secret } from "./types";
 
 export interface SetSecretInput {
@@ -17,22 +24,41 @@ export interface SetSecretInput {
 export interface SetSecretResult {
   secret: Secret;
   version: number;
-  created: boolean; // true if the secret was newly created (vs a new version)
+  created: boolean;
 }
 
 /**
- * Create a secret or add a new version to an existing one. Append-only:
- * previous versions are always retained. Writes are atomic (D1 batch).
+ * Create a secret or add a new version. Append-only: previous versions are
+ * always retained. Writes are atomic (D1 batch).
  */
 export async function setSecret(
   db: D1Database,
-  kek: CryptoKey,
+  keyring: Keyring,
   input: SetSecretInput
 ): Promise<SetSecretResult> {
   const existing = await getSecretByScopeName(db, input.projectId, input.repoId, input.name);
-  const sealed = await seal(input.value, input.name, kek);
+  const { sealed, kekVersion } = await sealValue(input.value, input.name, keyring);
   const now = Date.now();
   const versionId = newVersionId();
+
+  const insertVersion = (secretId: string, version: number) =>
+    db
+      .prepare(
+        "INSERT INTO secret_versions (id, secret_id, version, ciphertext, iv_value, wrapped_dek, iv_dek, kek_version, comment, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(
+        versionId,
+        secretId,
+        version,
+        sealed.ciphertext,
+        sealed.ivValue,
+        sealed.wrappedDek,
+        sealed.ivDek,
+        kekVersion,
+        input.comment ?? null,
+        input.createdBy ?? null,
+        now
+      );
 
   if (!existing) {
     const secret: Secret = {
@@ -62,43 +88,14 @@ export async function setSecret(
           now,
           now
         ),
-      db
-        .prepare(
-          "INSERT INTO secret_versions (id, secret_id, version, ciphertext, iv_value, wrapped_dek, iv_dek, comment, created_by, created_at) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)"
-        )
-        .bind(
-          versionId,
-          secret.id,
-          sealed.ciphertext,
-          sealed.ivValue,
-          sealed.wrappedDek,
-          sealed.ivDek,
-          input.comment ?? null,
-          input.createdBy ?? null,
-          now
-        )
+      insertVersion(secret.id, 1)
     ]);
     return { secret, version: 1, created: true };
   }
 
   const nextVersion = existing.current_version + 1;
   await db.batch([
-    db
-      .prepare(
-        "INSERT INTO secret_versions (id, secret_id, version, ciphertext, iv_value, wrapped_dek, iv_dek, comment, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-      )
-      .bind(
-        versionId,
-        existing.id,
-        nextVersion,
-        sealed.ciphertext,
-        sealed.ivValue,
-        sealed.wrappedDek,
-        sealed.ivDek,
-        input.comment ?? null,
-        input.createdBy ?? null,
-        now
-      ),
+    insertVersion(existing.id, nextVersion),
     db
       .prepare(
         "UPDATE secrets SET current_version = ?, updated_at = ?, deleted_at = NULL, is_env = ?, description = COALESCE(?, description) WHERE id = ?"
@@ -118,28 +115,27 @@ export async function setSecret(
   };
 }
 
-/** Decrypt and return the current value of a secret. */
 export async function getSecretValue(
   db: D1Database,
-  kek: CryptoKey,
+  keyring: Keyring,
   secretId: string
 ): Promise<{ secret: Secret; value: string; version: number } | null> {
   const secret = await getSecret(db, secretId);
   if (!secret || secret.deleted_at) return null;
   const row = await getCurrentVersionRow(db, secretId);
   if (!row) return null;
-  const value = await open(
+  const value = await openValue(
     { ciphertext: row.ciphertext, ivValue: row.iv_value, wrappedDek: row.wrapped_dek, ivDek: row.iv_dek },
     secret.name,
-    kek
+    keyring,
+    row.kek_version
   );
   return { secret, value, version: row.version };
 }
 
-/** Decrypt and return a specific historical version's value. */
 export async function getVersionValue(
   db: D1Database,
-  kek: CryptoKey,
+  keyring: Keyring,
   secretId: string,
   version: number
 ): Promise<{ secret: Secret; value: string; version: number } | null> {
@@ -147,10 +143,31 @@ export async function getVersionValue(
   if (!secret) return null;
   const row = await getVersionRow(db, secretId, version);
   if (!row) return null;
-  const value = await open(
+  const value = await openValue(
     { ciphertext: row.ciphertext, ivValue: row.iv_value, wrappedDek: row.wrapped_dek, ivDek: row.iv_dek },
     secret.name,
-    kek
+    keyring,
+    row.kek_version
   );
   return { secret, value, version: row.version };
+}
+
+/**
+ * Re-wrap every DEK not already at the active KEK version. Values are never
+ * re-encrypted — only the DEK wrapping changes. Returns how many were rotated.
+ */
+export async function rotateKek(db: D1Database, keyring: Keyring): Promise<number> {
+  const rows = await listAllWrapFields(db);
+  let rotated = 0;
+  for (const row of rows) {
+    if (row.kek_version === keyring.active) continue;
+    const rewrapped = await rewrapDek(
+      { wrappedDek: row.wrapped_dek, ivDek: row.iv_dek },
+      keyring,
+      row.kek_version
+    );
+    await updateVersionWrap(db, row.id, rewrapped.wrappedDek, rewrapped.ivDek, rewrapped.kekVersion);
+    rotated++;
+  }
+  return rotated;
 }

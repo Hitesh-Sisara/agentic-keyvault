@@ -5,22 +5,14 @@ import { ensureAdmin } from "../auth";
 import { mintToken, listTokens, revokeToken } from "../store/tokens";
 import { getProject } from "../store/projects";
 import { writeAudit } from "../store/audit";
+import { parseBody, mintTokenSchema } from "../validation";
 import type { TokenScope } from "../types";
 
 export const tokens = new Hono<AppEnv>();
 
-interface MintBody {
-  name?: string;
-  scope?: TokenScope;
-  projectId?: string;
-  canWrite?: boolean;
-  expiresAt?: number;
-}
-
 tokens.post("/", async (c) => {
   ensureAdmin(c.get("token"));
-  const body = await c.req.json<MintBody>().catch(() => ({}) as MintBody);
-  if (!body.name?.trim()) throw new HTTPException(400, { message: "name is required" });
+  const body = await parseBody(c, mintTokenSchema);
 
   const scope: TokenScope = body.scope === "project" ? "project" : "admin";
   if (scope === "project") {
@@ -30,7 +22,7 @@ tokens.post("/", async (c) => {
     }
   }
 
-  const { token, row } = await mintToken(c.env.DB, {
+  const { token, row } = await mintToken(c.env.DB, c.env.TOKEN_PEPPER, {
     name: body.name.trim(),
     scope,
     projectId: scope === "project" ? body.projectId : null,

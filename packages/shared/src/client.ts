@@ -137,4 +137,12 @@ export class KeyvaultClient {
       (r) => r.entries
     );
   }
+
+  // ---- key management ----
+  rotateKek() {
+    return this.request<{ ok: boolean; rotated: number; activeVersion: number }>(
+      "POST",
+      "/v1/kek/rotate"
+    );
+  }
 }

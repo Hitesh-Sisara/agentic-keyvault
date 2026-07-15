@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../http";
 import { ensureProjectAccess } from "../auth";
-import { loadKek } from "../crypto";
+import { loadKeyring } from "../crypto";
 import { getProject } from "../store/projects";
 import { getRepoByOrigin } from "../store/repos";
 import {
@@ -13,19 +13,9 @@ import {
 } from "../store/secrets";
 import { setSecret, getSecretValue, getVersionValue } from "../secret-service";
 import { writeAudit } from "../store/audit";
+import { parseBody, upsertSecretSchema, rotateSchema } from "../validation";
 
 export const secrets = new Hono<AppEnv>();
-
-interface UpsertBody {
-  projectId?: string;
-  repoId?: string | null;
-  origin?: string;
-  name?: string;
-  value?: string;
-  isEnv?: boolean;
-  description?: string;
-  comment?: string;
-}
 
 async function resolveRepoId(
   db: D1Database,
@@ -42,19 +32,15 @@ async function resolveRepoId(
 
 // PUT /v1/secrets — create or add a new version.
 secrets.put("/", async (c) => {
-  const body = await c.req.json<UpsertBody>().catch(() => ({}) as UpsertBody);
-  if (!body.projectId) throw new HTTPException(400, { message: "projectId is required" });
-  if (!body.name?.trim()) throw new HTTPException(400, { message: "name is required" });
-  if (body.value === undefined) throw new HTTPException(400, { message: "value is required" });
-
+  const body = await parseBody(c, upsertSecretSchema);
   ensureProjectAccess(c.get("token"), body.projectId, true);
   if (!(await getProject(c.env.DB, body.projectId))) {
     throw new HTTPException(404, { message: "project not found" });
   }
   const repoId = await resolveRepoId(c.env.DB, body);
-  const kek = await loadKek(c.env.MASTER_KEK);
+  const keyring = await loadKeyring(c.env);
 
-  const result = await setSecret(c.env.DB, kek, {
+  const result = await setSecret(c.env.DB, keyring, {
     projectId: body.projectId,
     repoId,
     name: body.name.trim(),
@@ -101,8 +87,8 @@ async function loadOwnedSecret(c: Context<AppEnv>, write: boolean) {
 // GET /v1/secrets/:id — current decrypted value.
 secrets.get("/:id", async (c) => {
   const secret = await loadOwnedSecret(c, false);
-  const kek = await loadKek(c.env.MASTER_KEK);
-  const result = await getSecretValue(c.env.DB, kek, secret.id);
+  const keyring = await loadKeyring(c.env);
+  const result = await getSecretValue(c.env.DB, keyring, secret.id);
   if (!result) throw new HTTPException(404, { message: "secret has no value" });
   await writeAudit(c.env.DB, {
     actorTokenId: c.get("token").id,
@@ -126,8 +112,8 @@ secrets.get("/:id/versions/:n", async (c) => {
   const secret = await loadOwnedSecret(c, false);
   const n = Number(c.req.param("n"));
   if (!Number.isInteger(n) || n < 1) throw new HTTPException(400, { message: "invalid version" });
-  const kek = await loadKek(c.env.MASTER_KEK);
-  const result = await getVersionValue(c.env.DB, kek, secret.id, n);
+  const keyring = await loadKeyring(c.env);
+  const result = await getVersionValue(c.env.DB, keyring, secret.id, n);
   if (!result) throw new HTTPException(404, { message: "version not found" });
   return c.json({ value: result.value, version: result.version });
 });
@@ -135,13 +121,10 @@ secrets.get("/:id/versions/:n", async (c) => {
 // POST /v1/secrets/:id/rotate — set a new value as the current version.
 secrets.post("/:id/rotate", async (c) => {
   const secret = await loadOwnedSecret(c, true);
-  const body = await c.req
-    .json<{ value?: string; comment?: string }>()
-    .catch(() => ({}) as { value?: string; comment?: string });
-  if (body.value === undefined) throw new HTTPException(400, { message: "value is required" });
+  const body = await parseBody(c, rotateSchema);
 
-  const kek = await loadKek(c.env.MASTER_KEK);
-  const result = await setSecret(c.env.DB, kek, {
+  const keyring = await loadKeyring(c.env);
+  const result = await setSecret(c.env.DB, keyring, {
     projectId: secret.project_id,
     repoId: secret.repo_id,
     name: secret.name,

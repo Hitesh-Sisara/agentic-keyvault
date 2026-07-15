@@ -73,17 +73,47 @@ export async function getVersionRow(
     .first<SecretVersionRow>();
 }
 
-export async function listVersions(
-  db: D1Database,
-  secretId: string
-): Promise<Omit<SecretVersionRow, "ciphertext" | "iv_value" | "wrapped_dek" | "iv_dek">[]> {
+export type VersionMetaRow = Pick<
+  SecretVersionRow,
+  "id" | "secret_id" | "version" | "kek_version" | "comment" | "created_by" | "created_at"
+>;
+
+export async function listVersions(db: D1Database, secretId: string): Promise<VersionMetaRow[]> {
   const { results } = await db
     .prepare(
-      "SELECT id, secret_id, version, comment, created_by, created_at FROM secret_versions WHERE secret_id = ? ORDER BY version DESC"
+      "SELECT id, secret_id, version, kek_version, comment, created_by, created_at FROM secret_versions WHERE secret_id = ? ORDER BY version DESC"
     )
     .bind(secretId)
-    .all<Omit<SecretVersionRow, "ciphertext" | "iv_value" | "wrapped_dek" | "iv_dek">>();
+    .all<VersionMetaRow>();
   return results;
+}
+
+export interface RewrapRow {
+  id: string;
+  wrapped_dek: string;
+  iv_dek: string;
+  kek_version: number;
+}
+
+/** All version DEK-wrap fields, for KEK rotation. */
+export async function listAllWrapFields(db: D1Database): Promise<RewrapRow[]> {
+  const { results } = await db
+    .prepare("SELECT id, wrapped_dek, iv_dek, kek_version FROM secret_versions")
+    .all<RewrapRow>();
+  return results;
+}
+
+export async function updateVersionWrap(
+  db: D1Database,
+  id: string,
+  wrappedDek: string,
+  ivDek: string,
+  kekVersion: number
+): Promise<void> {
+  await db
+    .prepare("UPDATE secret_versions SET wrapped_dek = ?, iv_dek = ?, kek_version = ? WHERE id = ?")
+    .bind(wrappedDek, ivDek, kekVersion, id)
+    .run();
 }
 
 export async function softDeleteSecret(db: D1Database, id: string): Promise<void> {

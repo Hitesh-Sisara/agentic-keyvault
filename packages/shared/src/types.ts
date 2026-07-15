@@ -42,6 +42,7 @@ export interface VersionMeta {
   id: string;
   secret_id: string;
   version: number;
+  kek_version: number;
   comment: string | null;
   created_by: string | null;
   created_at: number;

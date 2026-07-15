@@ -1,5 +1,5 @@
 import type { Token, TokenScope } from "../types";
-import { newTokenId, generateToken, sha256Hex } from "../ids";
+import { newTokenId, generateToken, hmacToken } from "../ids";
 
 export interface MintTokenInput {
   name: string;
@@ -12,13 +12,14 @@ export interface MintTokenInput {
 /** Create a token, returning the plaintext ONCE plus the stored row. */
 export async function mintToken(
   db: D1Database,
+  pepper: string,
   input: MintTokenInput
 ): Promise<{ token: string; row: Token }> {
   const token = generateToken();
   const row: Token = {
     id: newTokenId(),
     name: input.name,
-    token_hash: await sha256Hex(token),
+    token_hash: await hmacToken(token, pepper),
     scope: input.scope,
     project_id: input.projectId ?? null,
     can_write: input.canWrite ? 1 : 0,
@@ -49,9 +50,10 @@ export async function mintToken(
 
 export async function findTokenByPlaintext(
   db: D1Database,
+  pepper: string,
   token: string
 ): Promise<Token | null> {
-  const hash = await sha256Hex(token);
+  const hash = await hmacToken(token, pepper);
   return db.prepare("SELECT * FROM tokens WHERE token_hash = ?").bind(hash).first<Token>();
 }
 

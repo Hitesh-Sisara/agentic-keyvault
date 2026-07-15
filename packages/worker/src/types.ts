@@ -38,6 +38,7 @@ export interface SecretVersionRow {
   iv_value: string;
   wrapped_dek: string;
   iv_dek: string;
+  kek_version: number;
   comment: string | null;
   created_by: string | null;
   created_at: number;

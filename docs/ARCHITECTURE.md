@@ -43,11 +43,25 @@ self-hosted tool. KEK rotation re-wraps DEKs without re-encrypting values.
 
 ### Auth — opaque bearer tokens
 
-Random 256-bit tokens (`akv_` prefix), stored **SHA-256 hashed** in D1. A
-bootstrap **admin** token; plus **project-scoped** tokens with read-only or
-read-write permission for agents. CLI stores its token at
-`~/.config/agentic-keyvault/config.json` (chmod 600). OAuth 2.1 for remote MCP is
-a later enhancement.
+Random 256-bit tokens (`akv_` prefix), stored as a **peppered hash**
+`HMAC-SHA256(token, TOKEN_PEPPER)` in D1 (the pepper is a Worker secret, so a DB
+leak yields unusable hashes). A bootstrap **admin** token; plus **project-scoped**
+tokens with read-only or read-write permission and optional expiry for agents.
+CLI stores its token at `~/.config/agentic-keyvault/config.json` (chmod 600).
+OAuth 2.1 for remote MCP is a later enhancement.
+
+### KEK rotation
+
+The KEK is versioned. The active key is `MASTER_KEK` at version `KEK_VERSION`;
+retired keys stay available as `MASTER_KEK_V<n>` for decryption. `POST /v1/kek/rotate`
+re-wraps every DEK to the active version (values are never re-encrypted), after
+which the retired key can be removed. See `SECURITY.md`.
+
+### Request hardening
+
+`hono/secure-headers`, a 256 KB body limit, and `zod` validation on all write
+endpoints. Rate limiting is expected at the Cloudflare edge (WAF / Rate Limiting
+rules).
 
 ### Recoverability & rotation
 
@@ -65,7 +79,7 @@ repos           (id, project_id, origin UNIQUE, provider, owner, name, created_a
 secrets         (id, project_id, repo_id NULL, name, is_env, current_version,
                  description, created_at, updated_at)   -- UNIQUE(project_id, repo_id, name)
 secret_versions (id, secret_id, version, ciphertext, iv_value, wrapped_dek,
-                 iv_dek, comment, created_by, created_at)   -- append-only
+                 iv_dek, kek_version, comment, created_by, created_at)  -- append-only
 tokens          (id, name, token_hash UNIQUE, scope, project_id NULL, can_write,
                  created_at, last_used_at, expires_at, revoked)
 audit_log       (id, actor_token_id, action, target_type, target_id,
@@ -97,7 +111,8 @@ GET    /v1/tokens                        list tokens (admin only)
 DELETE /v1/tokens/:id                    revoke a token (admin only)
 
 GET    /v1/audit                         audit log (admin only)
-GET    /v1/bootstrap                     one-time admin token creation
+POST   /v1/kek/rotate                    re-wrap all DEKs to the active KEK (admin)
+POST   /v1/bootstrap                     one-time admin token creation
 ```
 
 ## Phased build

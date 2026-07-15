@@ -4,6 +4,8 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { secureHeaders } from "hono/secure-headers";
+import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "./http";
 import { requireAuth } from "./auth";
 import { bootstrap } from "./routes/bootstrap";
@@ -11,8 +13,21 @@ import { projects } from "./routes/projects";
 import { secrets } from "./routes/secrets";
 import { tokens } from "./routes/tokens";
 import { audit } from "./routes/audit";
+import { kek } from "./routes/kek";
+
+// A secret value should never approach this; caps memory use and abuse.
+const MAX_BODY_BYTES = 256 * 1024;
 
 const app = new Hono<AppEnv>();
+
+app.use("*", secureHeaders());
+app.use(
+  "/v1/*",
+  bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: (c) => c.json({ error: "request body too large" }, 413)
+  })
+);
 
 app.get("/health", (c) => c.json({ ok: true, service: "agentic-keyvault" }));
 
@@ -25,12 +40,13 @@ app.route("/v1/projects", projects);
 app.route("/v1/secrets", secrets);
 app.route("/v1/tokens", tokens);
 app.route("/v1/audit", audit);
+app.route("/v1/kek", kek);
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
     return c.json({ error: err.message }, err.status);
   }
-  console.error("unhandled error", err);
+  console.error(JSON.stringify({ level: "error", msg: "unhandled", error: String(err) }));
   return c.json({ error: "internal error" }, 500);
 });
 

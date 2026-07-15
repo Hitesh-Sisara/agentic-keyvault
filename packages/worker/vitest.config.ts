@@ -13,6 +13,8 @@ export default defineWorkersConfig(async () => {
             bindings: {
               // Deterministic 32-byte KEK for tests.
               MASTER_KEK: "Z6r1Qw9mVc0mJH2kR8xT5aP3nB7yD4uL1gS0eW6iH8k=",
+              KEK_VERSION: "1",
+              TOKEN_PEPPER: "test-pepper-do-not-use-in-production",
               ALLOW_BOOTSTRAP: "true",
               TEST_MIGRATIONS: migrations
             }

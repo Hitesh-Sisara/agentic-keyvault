@@ -30,8 +30,27 @@ export function generateToken(): string {
   return `akv_${b64url}`;
 }
 
-/** SHA-256 hex digest — used to store token hashes, never the token itself. */
+function toHex(buf: ArrayBuffer): string {
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** SHA-256 hex digest. */
 export async function sha256Hex(input: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return toHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input)));
+}
+
+/**
+ * Peppered token digest: HMAC-SHA256(pepper, token). Stored instead of the raw
+ * token. Because the pepper is a Worker secret (not in D1), a database leak
+ * yields hashes that cannot be recomputed or brute-forced offline.
+ */
+export async function hmacToken(token: string, pepper: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(pepper),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return toHex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token)));
 }

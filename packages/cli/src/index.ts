@@ -5,6 +5,7 @@ import { registerProjects } from "./commands/projects";
 import { registerSecrets } from "./commands/secrets";
 import { registerEnv } from "./commands/env";
 import { registerTokens } from "./commands/tokens";
+import { registerKek } from "./commands/kek";
 
 const program = new Command();
 
@@ -18,5 +19,6 @@ registerProjects(program);
 registerSecrets(program);
 registerEnv(program);
 registerTokens(program);
+registerKek(program);
 
 program.parseAsync(process.argv);
