@@ -3,10 +3,7 @@ import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { seal, open, loadKek, generateKekBase64, type SealedSecret } from "../src/crypto";
 
-interface TestEnv {
-  MASTER_KEK: string;
-}
-const KEK_B64 = (env as unknown as TestEnv).MASTER_KEK;
+const KEK_B64 = env.MASTER_KEK;
 
 describe("envelope crypto", () => {
   it("round-trips a value", async () => {
@@ -66,7 +63,7 @@ describe("envelope crypto", () => {
     const sealed = await seal("v", "K", kek);
     const bytes = atob(sealed.ciphertext);
     const arr = Uint8Array.from(bytes, (c) => c.charCodeAt(0));
-    arr[0] ^= 0xff;
+    arr[0] = (arr[0] ?? 0) ^ 0xff;
     let bin = "";
     for (const b of arr) bin += String.fromCharCode(b);
     const tampered: SealedSecret = { ...sealed, ciphertext: btoa(bin) };
