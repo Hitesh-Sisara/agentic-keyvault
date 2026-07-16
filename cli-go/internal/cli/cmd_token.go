@@ -94,7 +94,35 @@ func (a *App) newTokenCmd() *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(create, list, revoke)
+	exchange := &cobra.Command{
+		Use:   "exchange",
+		Short: "mint a short-lived, least-privilege child token (<=15m)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			project, _ := cmd.Flags().GetString("token-project")
+			write, _ := cmd.Flags().GetBool("write")
+			ttl, _ := cmd.Flags().GetInt("ttl")
+			c, r, err := a.client()
+			if err != nil {
+				return err
+			}
+			if project == "" {
+				project = r.Project
+			}
+			child, err := c.ExchangeToken(cmd.Context(), api.ExchangeInput{Project: project, CanWrite: write, TTLSeconds: ttl})
+			if err != nil {
+				return err
+			}
+			return a.emit(child, func() {
+				fmt.Fprintf(a.Err, "✓ child token for project %s (write=%v), expires in %ds:\n", child.Project, child.CanWrite, ttl)
+				fmt.Fprintln(a.Out, child.Token)
+			})
+		},
+	}
+	exchange.Flags().String("token-project", "", "project to scope to (defaults to active project)")
+	exchange.Flags().Bool("write", false, "request write (only granted if the caller can write)")
+	exchange.Flags().Int("ttl", 900, "lifetime in seconds (60-900)")
+
+	cmd.AddCommand(create, list, revoke, exchange)
 	return cmd
 }
 

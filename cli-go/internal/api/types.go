@@ -93,6 +93,47 @@ type WhoAmI struct {
 	ExpiresAt int64  `json:"expires_at"`
 }
 
+// SearchResults is the response of GET /v1/search.
+type SearchResults struct {
+	Projects []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Slug string `json:"slug"`
+	} `json:"projects"`
+	Repos []struct {
+		ID        string `json:"id"`
+		ProjectID string `json:"project_id"`
+		Origin    string `json:"origin"`
+	} `json:"repos"`
+	Secrets []struct {
+		ID        string `json:"id"`
+		ProjectID string `json:"project_id"`
+		RepoID    string `json:"repo_id"`
+		Name      string `json:"name"`
+	} `json:"secrets"`
+}
+
+// BulkItem is one entry in a bulk set request.
+type BulkItem struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+	IsEnv bool   `json:"isEnv,omitempty"`
+}
+
+type BulkResult struct {
+	Name    string `json:"name"`
+	Version int    `json:"version"`
+	Created bool   `json:"created"`
+}
+
+type ExchangedToken struct {
+	Token     string `json:"token"`
+	TokenType string `json:"token_type"`
+	Project   string `json:"project"`
+	CanWrite  bool   `json:"can_write"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
 // SetSecretInput is the body for creating/versioning a secret.
 type SetSecretInput struct {
 	ProjectID   string `json:"projectId"`

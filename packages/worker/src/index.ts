@@ -15,6 +15,8 @@ import { tokens } from "./routes/tokens";
 import { audit } from "./routes/audit";
 import { kek } from "./routes/kek";
 import { authRoutes } from "./routes/auth";
+import { searchRoutes } from "./routes/search";
+import { idempotency } from "./idempotency";
 
 // A secret value should never approach this; caps memory use and abuse.
 const MAX_BODY_BYTES = 256 * 1024;
@@ -37,12 +39,14 @@ app.route("/v1/bootstrap", bootstrap);
 
 // Everything below requires a bearer token.
 app.use("/v1/*", requireAuth);
+app.use("/v1/*", idempotency);
 app.route("/v1/auth", authRoutes);
 app.route("/v1/projects", projects);
 app.route("/v1/secrets", secrets);
 app.route("/v1/tokens", tokens);
 app.route("/v1/audit", audit);
 app.route("/v1/kek", kek);
+app.route("/v1/search", searchRoutes);
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

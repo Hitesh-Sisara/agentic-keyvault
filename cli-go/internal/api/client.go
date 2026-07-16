@@ -72,6 +72,10 @@ func isLocalhost(host string) bool {
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body, out any) error {
+	return c.doWithHeaders(ctx, method, path, body, out, nil)
+}
+
+func (c *Client) doWithHeaders(ctx context.Context, method, path string, body, out any, extra map[string]string) error {
 	var reader io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)
@@ -91,6 +95,9 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 	}
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	for k, v := range extra {
+		req.Header.Set(k, v)
 	}
 
 	resp, err := c.http.Do(req)

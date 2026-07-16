@@ -112,7 +112,15 @@ DELETE /v1/tokens/:id                    revoke a token (admin only)
 
 GET    /v1/audit                         audit log (admin only)
 POST   /v1/kek/rotate                    re-wrap all DEKs to the active KEK (admin)
+GET    /v1/secrets/export?project=&repo=&env=  decrypt a whole scope in one call
+POST   /v1/secrets/bulk                  atomic bulk create/version (single D1 batch)
+GET    /v1/search?q=&type=               metadata search (projects/repos/secret names)
+GET    /v1/auth/whoami                   report the calling token's authority
+POST   /v1/auth/exchange                 mint a short-lived, least-privilege child token
 POST   /v1/bootstrap                     one-time admin token creation
+
+Mutations honour an `Idempotency-Key` header: the first response per (token, key)
+is cached and replayed on retry, so a network retry never double-applies.
 ```
 
 ## Phased build

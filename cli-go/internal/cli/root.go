@@ -159,10 +159,13 @@ func NewRootCommand(app *App) *cobra.Command {
 		app.newRepoCmd(),
 		app.newSecretCmd(),
 		app.newExportCmd(),
+		app.newImportCmd(),
 		app.newRunCmd(),
+		app.newSearchCmd(),
 		app.newTokenCmd(),
 		app.newAuditCmd(),
 		app.newKekCmd(),
+		app.newUpgradeCmd(),
 		app.newCompletionCmd(root),
 		app.newVersionCmd(),
 	)

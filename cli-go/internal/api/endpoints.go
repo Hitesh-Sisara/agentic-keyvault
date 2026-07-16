@@ -151,6 +151,45 @@ func (c *Client) Audit(ctx context.Context, limit int) ([]AuditEntry, error) {
 	return out.Entries, c.do(ctx, "GET", fmt.Sprintf("/v1/audit?limit=%d", limit), nil, &out)
 }
 
+func (c *Client) Search(ctx context.Context, query, types string) (*SearchResults, error) {
+	q := url.Values{"q": {query}}
+	if types != "" {
+		q.Set("type", types)
+	}
+	var out SearchResults
+	return &out, c.do(ctx, "GET", "/v1/search?"+q.Encode(), nil, &out)
+}
+
+type BulkSetInput struct {
+	ProjectID string     `json:"projectId"`
+	RepoID    string     `json:"repoId,omitempty"`
+	Origin    string     `json:"origin,omitempty"`
+	Items     []BulkItem `json:"items"`
+}
+
+// BulkSet sends an atomic bulk write with an idempotency key so retries are safe.
+func (c *Client) BulkSet(ctx context.Context, in BulkSetInput, idempotencyKey string) ([]BulkResult, error) {
+	var out struct {
+		Results []BulkResult `json:"results"`
+	}
+	extra := map[string]string{}
+	if idempotencyKey != "" {
+		extra["Idempotency-Key"] = idempotencyKey
+	}
+	return out.Results, c.doWithHeaders(ctx, "POST", "/v1/secrets/bulk", in, &out, extra)
+}
+
+type ExchangeInput struct {
+	Project    string `json:"project,omitempty"`
+	CanWrite   bool   `json:"canWrite,omitempty"`
+	TTLSeconds int    `json:"ttlSeconds,omitempty"`
+}
+
+func (c *Client) ExchangeToken(ctx context.Context, in ExchangeInput) (*ExchangedToken, error) {
+	var out ExchangedToken
+	return &out, c.do(ctx, "POST", "/v1/auth/exchange", in, &out)
+}
+
 func (c *Client) RotateKek(ctx context.Context) (int, error) {
 	var out struct {
 		Rotated       int `json:"rotated"`

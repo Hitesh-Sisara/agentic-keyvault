@@ -19,6 +19,14 @@ func dotenvQuote(v string) string {
 	return v
 }
 
+// yamlQuote emits a double-quoted YAML scalar (safe for any string value).
+func yamlQuote(v string) string {
+	v = strings.ReplaceAll(v, `\`, `\\`)
+	v = strings.ReplaceAll(v, `"`, `\"`)
+	v = strings.ReplaceAll(v, "\n", `\n`)
+	return `"` + v + `"`
+}
+
 func (a *App) newExportCmd() *cobra.Command {
 	var origin, format, out string
 	var auto bool
@@ -60,8 +68,14 @@ func (a *App) newExportCmd() *cobra.Command {
 				}
 				buf, _ := json.MarshalIndent(m, "", "  ")
 				rendered = string(buf) + "\n"
+			case "yaml", "yml":
+				var b strings.Builder
+				for _, it := range items {
+					fmt.Fprintf(&b, "%s: %s\n", it.Name, yamlQuote(it.Value))
+				}
+				rendered = b.String()
 			default:
-				return fmt.Errorf("unknown --format %q (use dotenv|json)", format)
+				return fmt.Errorf("unknown --format %q (use dotenv|json|yaml)", format)
 			}
 
 			if out == "" {
@@ -79,7 +93,7 @@ func (a *App) newExportCmd() *cobra.Command {
 		},
 	}
 	addScopeFlags(cmd, &origin, &auto)
-	cmd.Flags().StringVar(&format, "format", "dotenv", "output format: dotenv|json")
+	cmd.Flags().StringVar(&format, "format", "dotenv", "output format: dotenv|json|yaml")
 	cmd.Flags().StringVar(&out, "out", "", "write to a file (0600, refuses overwrite) instead of stdout")
 	return cmd
 }

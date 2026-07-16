@@ -81,7 +81,24 @@ akv env push .env --project <id> --auto
 akv token mint ci-agent --project <id> --write
 ```
 
-Headless usage: set `AKV_URL` and `AKV_TOKEN` env vars instead of `akv login`.
+Headless usage: set `AKV_API_URL` and `AKV_TOKEN` env vars instead of `akv login`.
+
+### Go CLI (primary) — extra commands
+
+```bash
+akv run --auto -- node server.js        # inject env secrets into a subprocess (no shell)
+akv run --auto --watch -- ./server      # restart on secret change
+akv import .env --auto                  # bulk import (--on-conflict overwrite|skip|fail)
+akv export --auto --format yaml         # dotenv|json|yaml (stdout or --out file, 0600)
+akv search STRIPE                       # metadata search across projects/repos/secrets
+akv secret diff API_KEY --auto          # diff two versions (--from N --to M)
+akv token exchange --ttl 300            # short-lived least-privilege child token
+akv upgrade                             # self-update from GitHub releases
+akv completion zsh                      # shell completions
+```
+
+Global flags: `--json` (machine output), `--profile`, `--project`, `--repo`.
+Token resolution: `AKV_TOKEN` env → token file → OS keychain.
 
 ### Rotate the master key (KEK)
 

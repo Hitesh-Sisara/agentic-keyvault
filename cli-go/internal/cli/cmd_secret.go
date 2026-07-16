@@ -28,7 +28,67 @@ func (a *App) newSecretCmd() *cobra.Command {
 		a.secretVersions(),
 		a.secretRotate(),
 		a.secretDelete(),
+		a.secretDiff(),
 	)
+	return cmd
+}
+
+func (a *App) secretDiff() *cobra.Command {
+	var origin string
+	var auto bool
+	var from, to int
+	cmd := &cobra.Command{
+		Use:   "diff <name>",
+		Short: "show the diff between two versions of a secret",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, r, err := a.client()
+			if err != nil {
+				return err
+			}
+			project, err := a.requireProject(r)
+			if err != nil {
+				return err
+			}
+			repoID, err := a.scopeArgs(cmd.Context(), c, project, origin, auto)
+			if err != nil {
+				return err
+			}
+			id, err := a.resolveSecretID(cmd.Context(), c, project, repoID, args[0])
+			if err != nil {
+				return err
+			}
+			if to == 0 {
+				sv, err := c.GetSecret(cmd.Context(), id)
+				if err != nil {
+					return err
+				}
+				to = sv.Version
+			}
+			if from == 0 {
+				from = to - 1
+			}
+			if from < 1 {
+				return fmt.Errorf("nothing to compare: need at least two versions")
+			}
+			fromVal, err := c.GetSecretVersion(cmd.Context(), id, from)
+			if err != nil {
+				return err
+			}
+			toVal, err := c.GetSecretVersion(cmd.Context(), id, to)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(a.Out, "--- %s v%d\n+++ %s v%d\n", args[0], from, args[0], to)
+			for _, line := range diffLines(fromVal, toVal) {
+				fmt.Fprintln(a.Out, line)
+			}
+			return nil
+		},
+	}
+	addScopeFlags(cmd, &origin, &auto)
+	cmd.Flags().IntVar(&from, "from", 0, "from version (default: previous)")
+	cmd.Flags().IntVar(&to, "to", 0, "to version (default: current)")
 	return cmd
 }
 

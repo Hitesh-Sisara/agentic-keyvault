@@ -36,6 +36,29 @@ export const bindRepoSchema = z.object({
   origin: z.string().min(1).max(500)
 });
 
+export const bulkSecretsSchema = z.object({
+  projectId: z.string().min(1).max(64),
+  repoId: z.string().max(64).optional(),
+  origin: z.string().max(500).optional(),
+  items: z
+    .array(
+      z.object({
+        name: secretName,
+        value: z.string().max(MAX_VALUE_BYTES),
+        isEnv: z.boolean().optional(),
+        description: z.string().max(1000).optional()
+      })
+    )
+    .min(1)
+    .max(200)
+});
+
+export const exchangeSchema = z.object({
+  project: z.string().max(64).optional(),
+  canWrite: z.boolean().optional(),
+  ttlSeconds: z.number().int().min(60).max(900).optional()
+});
+
 export const mintTokenSchema = z.object({
   name: z.string().min(1).max(100),
   scope: z.enum(["admin", "project"]).optional(),

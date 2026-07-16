@@ -11,9 +11,9 @@ import {
   listVersions,
   softDeleteSecret
 } from "../store/secrets";
-import { setSecret, getSecretValue, getVersionValue, exportSecrets } from "../secret-service";
+import { setSecret, setSecretsBulk, getSecretValue, getVersionValue, exportSecrets } from "../secret-service";
 import { writeAudit } from "../store/audit";
-import { parseBody, upsertSecretSchema, rotateSchema } from "../validation";
+import { parseBody, upsertSecretSchema, rotateSchema, bulkSecretsSchema } from "../validation";
 
 export const secrets = new Hono<AppEnv>();
 
@@ -59,6 +59,32 @@ secrets.put("/", async (c) => {
     ip: c.req.header("cf-connecting-ip") ?? null
   });
   return c.json({ ...result.secret, version: result.version }, result.created ? 201 : 200);
+});
+
+// POST /v1/secrets/bulk — atomically create/version many secrets in one scope.
+secrets.post("/bulk", async (c) => {
+  const body = await parseBody(c, bulkSecretsSchema);
+  ensureProjectAccess(c.get("token"), body.projectId, true);
+  if (!(await getProject(c.env.DB, body.projectId))) {
+    throw new HTTPException(404, { message: "project not found" });
+  }
+  const repoId = await resolveRepoId(c.env.DB, body);
+  const keyring = await loadKeyring(c.env);
+  const results = await setSecretsBulk(c.env.DB, keyring, {
+    projectId: body.projectId,
+    repoId,
+    items: body.items,
+    createdBy: c.get("token").id
+  });
+  await writeAudit(c.env.DB, {
+    actorTokenId: c.get("token").id,
+    action: "secret.bulk",
+    targetType: "project",
+    targetId: body.projectId,
+    metadata: { count: results.length },
+    ip: c.req.header("cf-connecting-ip") ?? null
+  });
+  return c.json({ results }, 201);
 });
 
 // GET /v1/secrets?project=&repo=&env=1 — metadata only, no values.
