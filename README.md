@@ -61,9 +61,14 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and threa
 | Package | Description |
 |---|---|
 | [`packages/worker`](packages/worker) | Cloudflare Worker — REST API, envelope crypto, D1 access |
-| [`packages/cli`](packages/cli) | `akv` command-line client |
+| [`cli-go`](cli-go) | **`akv`** — the primary Go CLI (Cobra), static binaries via GoReleaser |
+| [`packages/cli`](packages/cli) | original TypeScript CLI (bun) |
 | [`packages/mcp`](packages/mcp) | stdio MCP server for AI agents |
-| [`packages/shared`](packages/shared) | shared API client + types |
+| [`packages/shared`](packages/shared) | shared TS API client + types |
+
+The **Go CLI** (`cli-go/`) is the primary, production CLI: OS-keychain token storage
+with `AKV_TOKEN` env override for agents/CI, `akv run -- <cmd>` to inject secrets
+into a subprocess, `.env`/JSON export, shell completions, and `--json` everywhere.
 
 ## Status
 

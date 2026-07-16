@@ -1,0 +1,6 @@
+# build artifacts
+/akv
+/bin/
+/dist/
+*.out
+coverage.txt

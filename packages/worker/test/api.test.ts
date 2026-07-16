@@ -46,6 +46,16 @@ describe("health & auth", () => {
     expect((await req("GET", "/v1/projects")).status).toBe(401);
     expect((await req("GET", "/v1/projects", { token: "akv_nope" })).status).toBe(401);
   });
+
+  it("whoami reports the admin token's authority", async () => {
+    const admin = await bootstrapAdmin();
+    const who = (await (await req("GET", "/v1/auth/whoami", { token: admin })).json()) as {
+      token_type: string;
+      can_write: boolean;
+    };
+    expect(who.token_type).toBe("admin");
+    expect(who.can_write).toBe(true);
+  });
 });
 
 describe("bootstrap", () => {
