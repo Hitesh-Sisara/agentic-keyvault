@@ -1,6 +1,6 @@
 module github.com/Hitesh-Sisara/agentic-keyvault/cli-go
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/pelletier/go-toml/v2 v2.2.3
