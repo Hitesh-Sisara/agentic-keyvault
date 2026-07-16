@@ -5,6 +5,7 @@ import {
   getSecretByScopeName,
   getCurrentVersionRow,
   getVersionRow,
+  listSecrets,
   listAllWrapFields,
   updateVersionWrap
 } from "./store/secrets";
@@ -150,6 +151,43 @@ export async function getVersionValue(
     row.kek_version
   );
   return { secret, value, version: row.version };
+}
+
+export interface ExportedSecret {
+  name: string;
+  value: string;
+  version: number;
+  is_env: number;
+}
+
+/**
+ * Decrypt every (current) secret value in a scope in a single call — avoids the
+ * N+1 round-trips of fetching each secret individually. Powers `env pull`,
+ * `sync`, and `run`.
+ */
+export async function exportSecrets(
+  db: D1Database,
+  keyring: Keyring,
+  filter: { projectId: string; repoId?: string | null; envOnly?: boolean }
+): Promise<ExportedSecret[]> {
+  const metas = await listSecrets(db, {
+    projectId: filter.projectId,
+    repoId: filter.repoId,
+    envOnly: filter.envOnly
+  });
+  const out: ExportedSecret[] = [];
+  for (const meta of metas) {
+    const row = await getCurrentVersionRow(db, meta.id);
+    if (!row) continue;
+    const value = await openValue(
+      { ciphertext: row.ciphertext, ivValue: row.iv_value, wrappedDek: row.wrapped_dek, ivDek: row.iv_dek },
+      meta.name,
+      keyring,
+      row.kek_version
+    );
+    out.push({ name: meta.name, value, version: row.version, is_env: meta.is_env });
+  }
+  return out;
 }
 
 /**

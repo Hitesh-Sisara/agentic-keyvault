@@ -113,6 +113,12 @@ describe("end-to-end secret lifecycle", () => {
       await req("GET", `/v1/secrets?project=${proj.id}&env=1`, { token: admin })
     ).json()) as { secrets: unknown[] };
     expect(list.secrets.length).toBe(1);
+
+    // batch export returns decrypted values in one call
+    const exported = (await (
+      await req("GET", `/v1/secrets/export?project=${proj.id}&env=1`, { token: admin })
+    ).json()) as { secrets: Array<{ name: string; value: string }> };
+    expect(exported.secrets).toEqual([{ name: "STRIPE_KEY", value: "sk_live_2", version: 2, is_env: 1 }]);
   });
 });
 

@@ -101,6 +101,16 @@ export class KeyvaultClient {
   getSecret(id: string) {
     return this.request<SecretValue>("GET", `/v1/secrets/${id}`);
   }
+  /** Decrypt a whole scope in one call (avoids N+1). */
+  exportSecrets(projectId: string, opts: { repo?: string | null; env?: boolean } = {}) {
+    const params = new URLSearchParams({ project: projectId });
+    if (opts.repo !== undefined) params.set("repo", opts.repo === null ? "none" : opts.repo);
+    if (opts.env) params.set("env", "1");
+    return this.request<{ secrets: Array<{ name: string; value: string; version: number; is_env: number }> }>(
+      "GET",
+      `/v1/secrets/export?${params}`
+    ).then((r) => r.secrets);
+  }
   listVersions(id: string) {
     return this.request<{ versions: VersionMeta[] }>("GET", `/v1/secrets/${id}/versions`).then(
       (r) => r.versions

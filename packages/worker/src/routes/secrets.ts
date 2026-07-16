@@ -11,7 +11,7 @@ import {
   listVersions,
   softDeleteSecret
 } from "../store/secrets";
-import { setSecret, getSecretValue, getVersionValue } from "../secret-service";
+import { setSecret, getSecretValue, getVersionValue, exportSecrets } from "../secret-service";
 import { writeAudit } from "../store/audit";
 import { parseBody, upsertSecretSchema, rotateSchema } from "../validation";
 
@@ -74,6 +74,31 @@ secrets.get("/", async (c) => {
     envOnly: c.req.query("env") === "1"
   });
   return c.json({ secrets: list });
+});
+
+// GET /v1/secrets/export?project=&repo=&env=1 — decrypted values for a whole
+// scope in ONE call (avoids N+1). Registered before /:id so it isn't shadowed.
+secrets.get("/export", async (c) => {
+  const projectId = c.req.query("project");
+  if (!projectId) throw new HTTPException(400, { message: "project query param is required" });
+  ensureProjectAccess(c.get("token"), projectId, false);
+
+  const repo = c.req.query("repo");
+  const keyring = await loadKeyring(c.env);
+  const items = await exportSecrets(c.env.DB, keyring, {
+    projectId,
+    repoId: repo === undefined ? undefined : repo === "" || repo === "none" ? null : repo,
+    envOnly: c.req.query("env") === "1"
+  });
+  await writeAudit(c.env.DB, {
+    actorTokenId: c.get("token").id,
+    action: "secret.export",
+    targetType: "project",
+    targetId: projectId,
+    metadata: { count: items.length },
+    ip: c.req.header("cf-connecting-ip") ?? null
+  });
+  return c.json({ secrets: items });
 });
 
 async function loadOwnedSecret(c: Context<AppEnv>, write: boolean) {
